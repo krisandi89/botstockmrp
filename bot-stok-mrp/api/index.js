@@ -6,7 +6,7 @@ const axios = require('axios');
 const SPREADSHEET_ID = '1i940JEzxFakE_XzNE_sEaJte7l484nBE0FGB0IiJJFg'; // ID Sheet BARU
 
 // Nama sheet/tab di dalam file Google Sheet Anda
-const SHEET_NAME = 'Sheet1'; // Nama sheet BARU
+const SHEET_NAME = 'FRONT'; // Nama sheet diubah ke FRONT
 
 // Token Bot Telegram Anda (dari Environment Variable)
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
@@ -48,7 +48,6 @@ async function findStock(itemName) {
             // Mengubah header menjadi format kecil_dengan_underscore (contoh: "Dimensi Roll" -> "dimensi_roll")
             const header = rows[0].map(h => h.toLowerCase().replace(/ /g, '_'));
             
-            // --- PERUBAHAN LOGIKA PENCARIAN ---
             // Mencari di kolom 'material' sesuai nama kolom di GSheet
             const nameIndex = header.indexOf('material');
 
@@ -122,13 +121,12 @@ module.exports = async (req, res) => {
         } else {
             const itemData = await findStock(itemName);
             if (itemData) {
-                // --- PERUBAHAN FORMAT BALASAN ---
+                // Format balasan sesuai permintaan
                 replyText = `✅ *Stok Ditemukan*\n\n` +
                             `*Brand:* ${itemData.brand}\n` +
-                            `*Material:* ${itemData.material}\n` + // Menggunakan itemData.material
-                            `*Dimensi Roll:* ${itemData.dimensi_roll}\n` + // Menggunakan itemData.dimensi_roll
+                            `*Material:* ${itemData.material}\n` +
+                            `*Dimensi Roll:* ${itemData.dimensi_roll}\n` +
                             `*Saldo:* ${itemData.saldo}`;
-                // --- AKHIR PERUBAHAN ---
             } else {
                 replyText = `❌ Maaf, material dengan nama "${itemName}" tidak ditemukan di database.`;
             }

@@ -3,11 +3,10 @@ const axios = require('axios');
 
 // --- KONFIGURASI ---
 // ID Google Sheet Anda (ambil dari URL)
-// https://docs.google.com/spreadsheets/d/THIS_IS_THE_ID/edit
-const SPREADSHEET_ID = '1z1XHeUaaAMuEvWm_sVqpORf-Gd1wfANxY6VcDROQRrk'; 
+const SPREADSHEET_ID = '1i940JEzxFakE_XzNE_sEaJte7l484nBE0FGB0IiJJFg'; // ID Sheet BARU
 
 // Nama sheet/tab di dalam file Google Sheet Anda
-const SHEET_NAME = 'Stok MRP'; // Nama sheet disesuaikan
+const SHEET_NAME = 'Sheet1'; // Nama sheet BARU
 
 // Token Bot Telegram Anda (dari Environment Variable)
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
@@ -46,18 +45,21 @@ async function findStock(itemName) {
 
         const rows = res.data.values;
         if (rows && rows.length > 0) {
-            // Mengubah header menjadi format kecil_dengan_underscore (contoh: "Nama Barang" -> "nama_barang")
+            // Mengubah header menjadi format kecil_dengan_underscore (contoh: "Dimensi Roll" -> "dimensi_roll")
             const header = rows[0].map(h => h.toLowerCase().replace(/ /g, '_'));
-            // Mencari di kolom 'nama_barang' (sebelumnya 'Material')
-            const nameIndex = header.indexOf('nama_barang');
+            
+            // --- PERUBAHAN LOGIKA PENCARIAN ---
+            // Mencari di kolom 'material' sesuai nama kolom di GSheet
+            const nameIndex = header.indexOf('material');
 
             if (nameIndex === -1) {
-                console.error('Kolom "nama_barang" tidak ditemukan di header sheet. Pastikan sel A1 berisi "nama_barang".');
+                console.error('Kolom "Material" tidak ditemukan di header sheet. Pastikan kolom itu ada.');
                 return null;
             }
 
-            // Cari baris yang cocok (case-insensitive)
-            const foundRow = rows.slice(1).find(row => row[nameIndex] && row[nameIndex].toLowerCase() === itemName.toLowerCase());
+            // Cari baris yang cocok (case-insensitive dan partial match)
+            const searchTerm = itemName.toLowerCase();
+            const foundRow = rows.slice(1).find(row => row[nameIndex] && row[nameIndex].toLowerCase().includes(searchTerm));
             
             if (foundRow) {
                 // Ubah baris array menjadi objek yang mudah dibaca
@@ -112,34 +114,27 @@ module.exports = async (req, res) => {
     let replyText = '';
 
     if (text === '/start') {
-        replyText = `👋 Halo ${message.from.first_name}!\n\nSelamat datang di Bot Cek Stok.\nKetik \`/cek_stok [nama barang]\` untuk mencari stok.\n\nContoh: \`/cek_stok Geogrid TX160\``;
+        replyText = `👋 Halo ${message.from.first_name}!\n\nSelamat datang di Bot Cek Stok.\nKetik \`/cek_stok [material]\` untuk mencari stok.\n\nContoh: \`/cek_stok Geotextile Non Woven\``;
     } else if (text.startsWith('/cek_stok')) {
         const itemName = text.substring('/cek_stok'.length).trim();
         if (!itemName) {
-            replyText = 'Silakan masukkan nama barang yang ingin dicari.\nContoh: `/cek_stok Geogrid TX160`';
+            replyText = 'Silakan masukkan nama material yang ingin dicari.\nContoh: `/cek_stok Geotextile Non Woven`';
         } else {
             const itemData = await findStock(itemName);
             if (itemData) {
-                // --- PERUBAHAN DIMULAI DI SINI ---
-                
-                // Menentukan status stok berdasarkan kolom 'jumlah'
-                // Jika ada isinya (bukan 'N/A' atau kosong), maka Ready.
-                const stokStatus = (itemData.jumlah && itemData.jumlah !== 'N/A') ? 'Ready' : 'Tidak Ready';
-
-                // Menyusun teks balasan sesuai format yang Anda minta
-                replyText = `✅ *Barang Ditemukan*\n\n` +
-                            `*Nama:* ${itemData.nama_barang}\n` +
-                            `*Dimensi:* ${itemData.dimensi}\n` +
-                            `*Stok:* ${stokStatus}\n` +
-                            `*Jumlah:* ${itemData.jumlah}`;
-                
-                // --- PERUBAHAN SELESAI DI SINI ---
+                // --- PERUBAHAN FORMAT BALASAN ---
+                replyText = `✅ *Stok Ditemukan*\n\n` +
+                            `*Brand:* ${itemData.brand}\n` +
+                            `*Material:* ${itemData.material}\n` + // Menggunakan itemData.material
+                            `*Dimensi Roll:* ${itemData.dimensi_roll}\n` + // Menggunakan itemData.dimensi_roll
+                            `*Saldo:* ${itemData.saldo}`;
+                // --- AKHIR PERUBAHAN ---
             } else {
-                replyText = `❌ Maaf, barang dengan nama "${itemName}" tidak ditemukan di database.`;
+                replyText = `❌ Maaf, material dengan nama "${itemName}" tidak ditemukan di database.`;
             }
         }
     } else {
-        replyText = 'Perintah tidak dikenali. Gunakan `/cek_stok [nama barang]` untuk memulai.';
+        replyText = 'Perintah tidak dikenali. Gunakan `/cek_stok [material]` untuk memulai.';
     }
 
     await sendTelegramMessage(chatId, replyText);

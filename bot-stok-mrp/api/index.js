@@ -40,24 +40,26 @@ async function findStock(itemName) {
         const sheets = await getSheetsClient();
         const res = await sheets.spreadsheets.values.get({
             spreadsheetId: SPREADSHEET_ID,
-            range: `${SHEET_NAME}!A:H`, // Baca dari kolom A sampai H
+            // --- PERUBAHAN UTAMA DI SINI ---
+            range: `${SHEET_NAME}!A7:H`, // Mulai membaca dari baris 7
         });
 
         const rows = res.data.values;
         if (rows && rows.length > 0) {
-            // --- PERBAIKAN LOGIKA HEADER ---
             // Mengubah header menjadi format kecil, tanpa spasi, dan underscore
+            // Header sekarang adalah baris pertama dari data yang diambil (yaitu baris 7 dari sheet)
             const header = rows[0].map(h => (h || '').toString().toLowerCase().trim().replace(/ /g, '_'));
             
             // Mencari di kolom 'material'
             const nameIndex = header.indexOf('material');
 
             if (nameIndex === -1) {
-                console.error('Kolom "Material" tidak ditemukan di header sheet. Header yang terdeteksi:', header.join(', '));
+                console.error('Kolom "Material" tidak ditemukan di header sheet (baris 7). Header yang terdeteksi:', header.join(', '));
                 return null;
             }
 
             // Cari baris yang cocok (case-insensitive dan partial match)
+            // Data dimulai dari baris kedua dari data yang diambil (yaitu baris 8 dari sheet)
             const searchTerm = itemName.toLowerCase();
             const foundRow = rows.slice(1).find(row => row[nameIndex] && row[nameIndex].toLowerCase().includes(searchTerm));
             

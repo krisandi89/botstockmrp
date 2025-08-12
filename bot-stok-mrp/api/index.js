@@ -7,7 +7,7 @@ const axios = require('axios');
 const SPREADSHEET_ID = '1z1XHeUaaAMuEvWm_sVqpORf-Gd1wfANxY6VcDROQRrk'; 
 
 // Nama sheet/tab di dalam file Google Sheet Anda
-const SHEET_NAME = 'Stok'; 
+const SHEET_NAME = 'Stok MRP'; // Nama sheet disesuaikan
 
 // Token Bot Telegram Anda (dari Environment Variable)
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
@@ -46,11 +46,13 @@ async function findStock(itemName) {
 
         const rows = res.data.values;
         if (rows && rows.length > 0) {
+            // Mengubah header menjadi format kecil_dengan_underscore (contoh: "Nama Barang" -> "nama_barang")
             const header = rows[0].map(h => h.toLowerCase().replace(/ /g, '_'));
+            // Mencari di kolom 'nama_barang' (sebelumnya 'Material')
             const nameIndex = header.indexOf('nama_barang');
 
             if (nameIndex === -1) {
-                console.error('Kolom "nama_barang" tidak ditemukan di header sheet.');
+                console.error('Kolom "nama_barang" tidak ditemukan di header sheet. Pastikan sel A1 berisi "nama_barang".');
                 return null;
             }
 
@@ -110,20 +112,28 @@ module.exports = async (req, res) => {
     let replyText = '';
 
     if (text === '/start') {
-        replyText = `👋 Halo ${message.from.first_name}!\n\nSelamat datang di Bot Cek Stok.\nKetik \`/cek_stok [nama barang]\` untuk mencari stok.\n\nContoh: \`/cek_stok Kemeja Polos Putih\``;
+        replyText = `👋 Halo ${message.from.first_name}!\n\nSelamat datang di Bot Cek Stok.\nKetik \`/cek_stok [nama barang]\` untuk mencari stok.\n\nContoh: \`/cek_stok Geogrid TX160\``;
     } else if (text.startsWith('/cek_stok')) {
         const itemName = text.substring('/cek_stok'.length).trim();
         if (!itemName) {
-            replyText = 'Silakan masukkan nama barang yang ingin dicari.\nContoh: `/cek_stok Buku Tulis`';
+            replyText = 'Silakan masukkan nama barang yang ingin dicari.\nContoh: `/cek_stok Geogrid TX160`';
         } else {
             const itemData = await findStock(itemName);
             if (itemData) {
+                // --- PERUBAHAN DIMULAI DI SINI ---
+                
+                // Menentukan status stok berdasarkan kolom 'jumlah'
+                // Jika ada isinya (bukan 'N/A' atau kosong), maka Ready.
+                const stokStatus = (itemData.jumlah && itemData.jumlah !== 'N/A') ? 'Ready' : 'Tidak Ready';
+
+                // Menyusun teks balasan sesuai format yang Anda minta
                 replyText = `✅ *Barang Ditemukan*\n\n` +
                             `*Nama:* ${itemData.nama_barang}\n` +
-                            `*Stok:* ${itemData.jumlah_stok} ${itemData.satuan}\n` +
-                            `*Harga:* Rp ${itemData.harga}\n` +
-                            `*Lokasi:* ${itemData.lokasi_rak}\n` +
-                            `*Update:* ${itemData.terakhir_update}`;
+                            `*Dimensi:* ${itemData.dimensi}\n` +
+                            `*Stok:* ${stokStatus}\n` +
+                            `*Jumlah:* ${itemData.jumlah}`;
+                
+                // --- PERUBAHAN SELESAI DI SINI ---
             } else {
                 replyText = `❌ Maaf, barang dengan nama "${itemName}" tidak ditemukan di database.`;
             }

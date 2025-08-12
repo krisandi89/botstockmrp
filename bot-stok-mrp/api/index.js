@@ -45,14 +45,15 @@ async function findStock(itemName) {
 
         const rows = res.data.values;
         if (rows && rows.length > 0) {
-            // Mengubah header menjadi format kecil_dengan_underscore (contoh: "Dimensi Roll" -> "dimensi_roll")
-            const header = rows[0].map(h => h.toLowerCase().replace(/ /g, '_'));
+            // --- PERBAIKAN LOGIKA HEADER ---
+            // Mengubah header menjadi format kecil, tanpa spasi, dan underscore
+            const header = rows[0].map(h => (h || '').toString().toLowerCase().trim().replace(/ /g, '_'));
             
-            // Mencari di kolom 'material' sesuai nama kolom di GSheet
+            // Mencari di kolom 'material'
             const nameIndex = header.indexOf('material');
 
             if (nameIndex === -1) {
-                console.error('Kolom "Material" tidak ditemukan di header sheet. Pastikan kolom itu ada.');
+                console.error('Kolom "Material" tidak ditemukan di header sheet. Header yang terdeteksi:', header.join(', '));
                 return null;
             }
 

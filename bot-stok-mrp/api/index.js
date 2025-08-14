@@ -7,11 +7,6 @@ const SHEET_NAME = 'FRONT';
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const TELEGRAM_API_URL = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}`;
 const GOOGLE_CREDENTIALS = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_CREDENTIALS || '{}');
-const BOT_PASSWORD = process.env.BOT_PASSWORD; // Password dari Environment Variable
-
-// --- State Sederhana untuk Autentikasi ---
-// Menyimpan chatID yang sudah berhasil login.
-const authenticatedUsers = new Set();
 
 /**
  * Fungsi untuk mengautentikasi dan mendapatkan instance Google Sheets API
@@ -47,6 +42,7 @@ async function findStock(itemName) {
             return null;
         }
 
+        // Menangani merged cells untuk Brand
         let lastBrand = '';
         rows = rows.map(row => {
             if (row[0] && row[0].trim() !== '') {
@@ -65,7 +61,10 @@ async function findStock(itemName) {
             return null;
         }
         
+        // Pencarian fleksibel (broad search)
         const searchTerm = itemName.toLowerCase().replace(/\s/g, '');
+
+        // Mencari semua hasil yang cocok
         const foundRows = rows.slice(1).filter(row => {
             const materialName = row[nameIndex];
             if (materialName) {
@@ -76,9 +75,10 @@ async function findStock(itemName) {
         });
 
         if (foundRows.length === 0) {
-            return null;
+            return null; // Tidak ada hasil sama sekali
         }
 
+        // Ubah semua baris yang ditemukan menjadi objek
         return foundRows.map(row => {
             const itemData = {};
             header.forEach((key, index) => {
@@ -97,6 +97,7 @@ async function findStock(itemName) {
  * Fungsi untuk mengirim pesan balasan ke Telegram
  */
 async function sendTelegramMessage(chatId, text) {
+    // Batasi panjang pesan agar tidak error di Telegram
     const MAX_LENGTH = 4096;
     if (text.length > MAX_LENGTH) {
         text = text.substring(0, MAX_LENGTH - 15) + '... (dan lainya)';
@@ -129,34 +130,8 @@ module.exports = async (req, res) => {
     const text = message.text.trim();
     let replyText = '';
 
-    // --- REVISI: LOGIKA PASSWORD ---
-
-    // Perintah /login adalah publik dan bisa diakses siapa saja
-    if (text.startsWith('/login')) {
-        const passwordGuess = text.substring('/login'.length).trim();
-        if (!BOT_PASSWORD) {
-            replyText = '🔒 Fitur password belum diaktifkan oleh admin.';
-        } else if (passwordGuess === BOT_PASSWORD) {
-            authenticatedUsers.add(chatId);
-            replyText = '✅ Login berhasil! Anda sekarang bisa menggunakan perintah /cek_stok.';
-        } else {
-            replyText = '❌ Password salah. Coba lagi.';
-        }
-        await sendTelegramMessage(chatId, replyText);
-        return res.status(200).send('OK');
-    }
-
-    // Cek apakah pengguna sudah login untuk semua perintah lainnya
-    if (!authenticatedUsers.has(chatId)) {
-        replyText = '🔒 Bot ini dilindungi password. Silakan login terlebih dahulu dengan perintah:\n`/login [password]`';
-        await sendTelegramMessage(chatId, replyText);
-        return res.status(200).send('OK');
-    }
-
-    // --- Logika Perintah yang Dilindungi (Hanya untuk yang sudah login) ---
-
     if (text === '/start') {
-        replyText = `👋 Halo ${message.from.first_name}!\n\nAnda sudah login. Ketik \`/cek_stok [material]\` untuk mencari stok.`;
+        replyText = `👋 Halo ${message.from.first_name}!\n\nSelamat datang di Bot Cek Stok.\nKetik \`/cek_stok [material]\` untuk mencari stok.\n\nContoh: \`/cek_stok Geotextile\``;
     } else if (text.startsWith('/cek_stok')) {
         const itemName = text.substring('/cek_stok'.length).trim();
         if (!itemName) {
@@ -165,6 +140,7 @@ module.exports = async (req, res) => {
             const results = await findStock(itemName);
             if (results && results.length > 0) {
                 if (results.length === 1) {
+                    // Jika hanya ada 1 hasil, tampilkan detail lengkap
                     const itemData = results[0];
                     replyText = `✅ *Stok Ditemukan*\n\n` +
                                 `*Brand:* ${itemData.brand}\n` +
@@ -172,8 +148,10 @@ module.exports = async (req, res) => {
                                 `*Dimensi Roll:* ${itemData.dimensi_roll}\n` +
                                 `*Saldo:* ${itemData.saldo}`;
                 } else {
+                    // Jika ada banyak hasil, tampilkan daftar ringkas
                     replyText = `✅ Ditemukan *${results.length}* material yang cocok:\n\n`;
                     results.forEach((item, index) => {
+                        // Batasi daftar hingga 15 item agar tidak terlalu panjang
                         if (index < 15) {
                             replyText += `• *${item.material}* (Saldo: ${item.saldo})\n`;
                         }
